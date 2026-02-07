@@ -1,4 +1,4 @@
-kind: Deployment
+kind: Deploymenit
 apiVersion: apps/v1
 metadata:
   name: notes-app-deployment
@@ -23,6 +23,6 @@ spec:
     spec:
       containers:
         - name: notes-app
-          image: myselfazeem/notes-app-k8s
+          image: IMAGE_PLACEHOLDER
           ports:
             - containerPort: 8000
