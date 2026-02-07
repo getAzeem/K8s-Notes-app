@@ -1,10 +1,12 @@
-Django Notes App – CI/CD with GitLab & Kubernetes
+# Django Notes App – CI/CD with GitLab & Kubernetes
 
-This project demonstrates a production-style CI/CD pipeline for a Django application using Docker, GitLab CI, and Kubernetes (kind).
+This project demonstrates a production-style CI/CD pipeline for a Django application using Docker, GitLab CI, and Kubernetes (kind). The pipeline builds a Docker image, pushes it to DockerHub, and deploys the application to a Kubernetes cluster using a Deployment and Service.
 
-The pipeline builds a Docker image, pushes it to DockerHub, and deploys the application to a Kubernetes cluster using a Deployment and Service.
+---
 
-📌 High-Level Flow
+## 📌 High-Level Flow
+
+```
 Code Push
    ↓
 GitLab CI Pipeline
@@ -18,166 +20,145 @@ Kubernetes Deployment Update
 Pods (2 replicas)
    ↓
 Service (ClusterIP)
+```
 
-🧱 Architecture Overview
+---
 
-Docker
+## 🧱 Architecture Overview
+
+### Docker
 Used to containerize the Django application.
 
-GitLab CI
+### GitLab CI
 Automates build and deployment.
 
-Kubernetes (kind)
+### Kubernetes (kind)
 Runs the application locally with:
+- Namespace
+- Deployment (2 replicas)
+- Service (ClusterIP)
 
-Namespace
+---
 
-Deployment (2 replicas)
+## 🧪 Kubernetes Setup
 
-Service (ClusterIP)
-
-🧪 Kubernetes Setup
-Namespace
-
+### Namespace
 All application resources run inside a dedicated namespace:
-
+```
 notesapp
-
-
+```
 This keeps the application isolated from other workloads.
 
-Deployment
+### Deployment
+- Uses the Docker image pushed by the pipeline
+- Runs 2 replicas for availability
+- Kubernetes automatically recreates Pods if they fail
+- Image is updated per commit (no latest tag)
 
-Uses the Docker image pushed by the pipeline
+**Key characteristics:**
+- apps/v1 Deployment
+- Label-based Pod selection
+- Self-healing via ReplicaSet
 
-Runs 2 replicas for availability
+### Service
+- **Type:** ClusterIP
+- Exposes the application inside the cluster
+- Selects Pods using labels
+- Used for:
+  - Internal communication
+  - Port-forwarding for local access
 
-Kubernetes automatically recreates Pods if they fail
-
-Image is updated per commit (no latest tag)
-
-Key characteristics:
-
-apps/v1 Deployment
-
-Label-based Pod selection
-
-Self-healing via ReplicaSet
-
-Service
-
-Type: ClusterIP
-
-Exposes the application inside the cluster
-
-Selects Pods using labels
-
-Used for:
-
-internal communication
-
-port-forwarding for local access
-
-Example access (local):
-
+**Example access (local):**
+```bash
 kubectl port-forward svc/notes-app-service 8000:8000 -n notesapp
+```
 
-🚀 CI/CD Pipeline Overview
+---
+
+## 🚀 CI/CD Pipeline Overview
 
 The pipeline runs in two stages:
 
-1️⃣ Build Stage
+### 1️⃣ Build Stage
+- Pulls code from the repository
+- Builds a Docker image
+- Tags the image with the Git commit SHA
+- Pushes the image to DockerHub
 
-Pulls code from the repository
+**Why this matters:**
+- Every deployment is traceable
+- Easy rollbacks
+- No mutable latest tag
 
-Builds a Docker image
+### 2️⃣ Deploy Stage
+- Connects to the Kubernetes cluster using kubectl
+- Creates namespace (idempotent)
+- Updates Deployment image dynamically
+- Applies Deployment and Service manifests
+- Verifies rollout status
 
-Tags the image with the Git commit SHA
+---
 
-Pushes the image to DockerHub
+## 🔐 Pipeline Requirements
 
-Why this matters:
-
-Every deployment is traceable
-
-Easy rollbacks
-
-No mutable latest tag
-
-2️⃣ Deploy Stage
-
-Connects to the Kubernetes cluster using kubectl
-
-Creates namespace (idempotent)
-
-Updates Deployment image dynamically
-
-Applies Deployment and Service manifests
-
-Verifies rollout status
-
-🔐 Pipeline Requirements
-GitLab Runner
-
+### GitLab Runner
 The runner executing the pipeline must have:
+- `docker`
+- `kubectl`
+- Network access to the Kubernetes API server
 
-docker
+### GitLab CI Variables
+The following variables must be configured in **GitLab → CI/CD → Variables**:
 
-kubectl
+| Variable Name | Description |
+|---------------|-------------|
+| `DOCKERHUB_USERNAME` | DockerHub username |
+| `DOCKERHUB_PASSWORD` | DockerHub password / token |
+| `KUBECONFIG` | Base64-encoded kubeconfig |
 
-Network access to the Kubernetes API server
+⚠️ **Secrets are never stored in the repository**
 
-GitLab CI Variables
+---
 
-The following variables must be configured in GitLab → CI/CD → Variables:
-
-Variable Name	Description
-DOCKERHUB_USERNAME	DockerHub username
-DOCKERHUB_PASSWORD	DockerHub password / token
-KUBECONFIG	Base64-encoded kubeconfig
-
-⚠️ Secrets are never stored in the repository
-
-🧠 Image Tagging Strategy
+## 🧠 Image Tagging Strategy
 
 Images are tagged using:
-
+```
 <commit-short-sha>
+```
 
-
-Example:
-
+**Example:**
+```
 myselfazeem/notes-app-k8s:a3f92bd
+```
 
+**Benefits:**
+- Immutable deployments
+- Easy rollback
+- Clear audit trail
 
-Benefits:
+---
 
-Immutable deployments
+## 🛡️ Security Notes
 
-Easy rollback
+- `kubectl port-forward` binds only to localhost
+- The application is not exposed to the public internet
+- Service type is ClusterIP (safe by default)
+- No node ports or load balancers are used in local setup
 
-Clear audit trail
+---
 
-🛡️ Security Notes
-
-kubectl port-forward binds only to localhost
-
-The application is not exposed to the public internet
-
-Service type is ClusterIP (safe by default)
-
-No node ports or load balancers are used in local setup
-
-🧩 Local Development Access
+## 🧩 Local Development Access
 
 To access the app locally:
 
+```bash
 kubectl port-forward svc/notes-app-service 8000:8000 -n notesapp
-
+```
 
 Then open:
-
+```
 http://localhost:8000
-
+```
 
 Stopping the command immediately closes access.
